@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Users, BookOpen, AlertTriangle, Home, TrendingDown } from 'lucide-react';
+import { Users, BookOpen, AlertTriangle, Home, TrendingDown, BarChart3, FileText, Info } from 'lucide-react';
 import { getRiskLabelThai, getRiskColor } from '@/lib/analytics';
 
 interface Stats {
@@ -174,7 +174,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <Link
                         href="/dashboard/students"
                         className="bg-white rounded-xl shadow-md p-8 hover:shadow-lg transition-shadow border border-gray-200 hover:border-blue-300"
@@ -192,7 +192,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex gap-4 text-sm">
                             <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full">
-                                {stats.students.critical} วิฤต
+                                {stats.students.critical} วิกฤต
                             </span>
                             <span className="px-3 py-1 bg-orange-50 text-orange-600 rounded-full">
                                 {stats.students.monitor} เฝ้าระวัง
@@ -224,6 +224,72 @@ export default function DashboardPage() {
                             </span>
                             <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full">
                                 {stats.courses.highAbsence} ขาดมาก
+                            </span>
+                        </div>
+                    </Link>
+
+                    <Link
+                        href="/dashboard/charts"
+                        className="bg-white rounded-xl shadow-md p-8 hover:shadow-lg transition-shadow border border-gray-200 hover:border-green-300"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-green-100 p-4 rounded-lg">
+                                <BarChart3 className="w-8 h-8 text-green-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">
+                                    กราฟวิเคราะห์
+                                </h3>
+                                <p className="text-gray-600">Trend Analysis & Visualization</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-4 text-sm">
+                            <span className="px-3 py-1 bg-green-50 text-green-600 rounded-full">
+                                Pie / Bar / Histogram
+                            </span>
+                        </div>
+                    </Link>
+
+                    <Link
+                        href="/dashboard/reports"
+                        className="bg-white rounded-xl shadow-md p-8 hover:shadow-lg transition-shadow border border-gray-200 hover:border-red-300"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-red-100 p-4 rounded-lg">
+                                <FileText className="w-8 h-8 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">
+                                    รายงาน PDF
+                                </h3>
+                                <p className="text-gray-600">ดาวน์โหลดสรุปผลรายงาน</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-4 text-sm">
+                            <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full">
+                                สรุปรายสัปดาห์
+                            </span>
+                        </div>
+                    </Link>
+
+                    <Link
+                        href="/dashboard/manual"
+                        className="bg-white rounded-xl shadow-md p-8 hover:shadow-lg transition-shadow border border-gray-200 hover:border-indigo-300"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-indigo-100 p-4 rounded-lg">
+                                <Info className="w-8 h-8 text-indigo-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">
+                                    คู่มือระบบ
+                                </h3>
+                                <p className="text-gray-600">เกณฑ์การคำนวณและวิธีใช้งาน</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-4 text-sm">
+                            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full">
+                                Documentation
                             </span>
                         </div>
                     </Link>
