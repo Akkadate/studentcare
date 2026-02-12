@@ -17,9 +17,9 @@ interface ChartData {
 
 const RADIAN = Math.PI / 180;
 
-function renderCustomizedLabel({
-    cx, cy, midAngle, innerRadius, outerRadius, percent, name
-}: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; percent: number; name: string }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderCustomizedLabel(props: any) {
+    const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
@@ -120,7 +120,7 @@ export default function ChartsPage() {
                                                 <Cell key={`cell-${index}`} fill={entry.color} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: number) => [`${value} คน`, '']} />
+                                        <Tooltip formatter={(value: any) => [`${value} คน`, '']} />
                                         <Legend
                                             formatter={(value: string) => {
                                                 const item = data.riskDistribution.find(d => d.name === value);
@@ -143,8 +143,8 @@ export default function ChartsPage() {
                                         <XAxis dataKey="range" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={60} />
                                         <YAxis label={{ value: 'จำนวน (คน)', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }} />
                                         <Tooltip
-                                            formatter={(value: number) => [`${value} คน`, 'จำนวน']}
-                                            labelFormatter={(label: string) => `ช่วง: ${label}`}
+                                            formatter={(value: any) => [`${value} คน`, 'จำนวน']}
+                                            labelFormatter={(label: any) => `ช่วง: ${label}`}
                                         />
                                         <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]}>
                                             {data.absenceDistribution.map((entry, index) => {
@@ -173,7 +173,7 @@ export default function ChartsPage() {
                                         <XAxis type="number" label={{ value: 'จำนวนนักศึกษา (คน)', position: 'insideBottom', offset: -5, style: { fontSize: 12 } }} />
                                         <YAxis type="category" dataKey="course" tick={{ fontSize: 11 }} width={120} />
                                         <Tooltip
-                                            formatter={(value: number, name: string) => {
+                                            formatter={(value: any, name: any) => {
                                                 if (name === 'highAbsence') return [`${value} คน`, 'ขาดมาก'];
                                                 if (name === 'totalStudents') return [`${value} คน`, 'ทั้งหมด'];
                                                 return [value, name];

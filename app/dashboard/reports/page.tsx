@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Home, Download, FileText, AlertTriangle, Eye, Users, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -10,41 +10,86 @@ import { StudentAnalytics } from '@/lib/types';
 // Extend jsPDF type for autoTable
 declare module 'jspdf' {
     interface jsPDF {
-        autoTable: (options: Record<string, unknown>) => jsPDF;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        autoTable: (options: Record<string, any>) => jsPDF;
     }
 }
 
 function getRiskLabel(level: string): string {
     const labels: Record<string, string> = {
-        critical: 'Critical',
-        monitor: 'Monitor',
-        follow_up: 'Follow-up',
-        normal: 'Normal'
+        critical: 'วิกฤต',
+        monitor: 'เฝ้าระวัง',
+        follow_up: 'ติดตาม',
+        normal: 'ปกติ'
     };
     return labels[level] || level;
 }
 
-function getRiskThaiLabel(level: string): string {
-    const labels: Record<string, string> = {
-        critical: 'Wikit',
-        monitor: 'Faorawang',
-        follow_up: 'Tidtam',
-        normal: 'Pokati'
-    };
-    return labels[level] || level;
+// Fetch and cache Sarabun font as base64
+let cachedFontBase64: string | null = null;
+
+async function loadSarabunFont(): Promise<string> {
+    if (cachedFontBase64) return cachedFontBase64;
+
+    // Fetch Sarabun-Regular.ttf from Google Fonts GitHub
+    const res = await fetch(
+        'https://cdn.jsdelivr.net/gh/nicedoc/thai-fonts@main/fonts/Sarabun/Sarabun-Regular.ttf'
+    );
+
+    if (!res.ok) {
+        // Fallback: try another CDN
+        const res2 = await fetch(
+            'https://cdn.jsdelivr.net/gh/nicedoc/thai-fonts/fonts/Sarabun/Sarabun-Regular.ttf'
+        );
+        if (!res2.ok) throw new Error('Failed to load Sarabun font');
+        const buffer = await res2.arrayBuffer();
+        cachedFontBase64 = arrayBufferToBase64(buffer);
+        return cachedFontBase64;
+    }
+
+    const buffer = await res.arrayBuffer();
+    cachedFontBase64 = arrayBufferToBase64(buffer);
+    return cachedFontBase64;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
 }
 
 export default function ReportsPage() {
     const [students, setStudents] = useState<StudentAnalytics[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
+    const [fontLoading, setFontLoading] = useState(false);
+    const [fontLoaded, setFontLoaded] = useState(false);
     const [stats, setStats] = useState<{
         students: { total: number; critical: number; monitor: number; followUp: number; normal: number };
     } | null>(null);
+    const fontRef = useRef<string | null>(null);
 
     useEffect(() => {
         Promise.all([fetchStudents(), fetchStats()]);
+        // Preload font
+        preloadFont();
     }, []);
+
+    async function preloadFont() {
+        setFontLoading(true);
+        try {
+            const base64 = await loadSarabunFont();
+            fontRef.current = base64;
+            setFontLoaded(true);
+        } catch (error) {
+            console.error('Failed to preload font:', error);
+        } finally {
+            setFontLoading(false);
+        }
+    }
 
     async function fetchStudents() {
         try {
@@ -68,49 +113,76 @@ export default function ReportsPage() {
         }
     }
 
+    function setupThaiFont(doc: jsPDF) {
+        if (fontRef.current) {
+            doc.addFileToVFS('Sarabun-Regular.ttf', fontRef.current);
+            doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
+            doc.setFont('Sarabun');
+        }
+    }
+
     async function generatePDF(filterLevel: string = 'all') {
         setGenerating(true);
 
         try {
+            // Ensure font is loaded
+            if (!fontRef.current) {
+                try {
+                    const base64 = await loadSarabunFont();
+                    fontRef.current = base64;
+                    setFontLoaded(true);
+                } catch {
+                    // Proceed without Thai font
+                    console.warn('Could not load Thai font, proceeding without it');
+                }
+            }
+
             const doc = new jsPDF('p', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
             const now = new Date();
             const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+            // Setup Thai font
+            setupThaiFont(doc);
+
             // Title
             doc.setFontSize(18);
             doc.setTextColor(30, 58, 138);
-            doc.text('Student Monitoring Report', pageWidth / 2, 20, { align: 'center' });
+            doc.text('รายงานสรุประบบดูแลการเรียนของนักศึกษา', pageWidth / 2, 20, { align: 'center' });
 
             doc.setFontSize(11);
             doc.setTextColor(100, 100, 100);
-            doc.text(`Generated: ${dateStr}`, pageWidth / 2, 28, { align: 'center' });
+            doc.text(`วันที่ออกรายงาน: ${dateStr}`, pageWidth / 2, 28, { align: 'center' });
+
+            let yPos = 35;
 
             if (filterLevel !== 'all') {
                 doc.setFontSize(12);
                 doc.setTextColor(220, 50, 50);
-                doc.text(`Filter: ${getRiskLabel(filterLevel)} students only`, pageWidth / 2, 35, { align: 'center' });
+                doc.text(`กรอง: เฉพาะระดับ ${getRiskLabel(filterLevel)}`, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 8;
             }
 
             // Summary Statistics
             if (stats) {
                 doc.setFontSize(14);
                 doc.setTextColor(30, 58, 138);
-                doc.text('Summary Statistics', 14, filterLevel !== 'all' ? 48 : 42);
+                doc.text('สรุปภาพรวม', 14, yPos + 5);
 
+                const font = fontRef.current ? 'Sarabun' : 'helvetica';
                 doc.autoTable({
-                    startY: filterLevel !== 'all' ? 52 : 46,
-                    head: [['Category', 'Count']],
+                    startY: yPos + 8,
+                    head: [['ประเภท', 'จำนวน (คน)']],
                     body: [
-                        ['Total Students', String(stats.students.total)],
-                        ['Critical', String(stats.students.critical)],
-                        ['Monitor', String(stats.students.monitor)],
-                        ['Follow-up', String(stats.students.followUp)],
-                        ['Normal', String(stats.students.normal)],
+                        ['นักศึกษาทั้งหมด', String(stats.students.total)],
+                        ['วิกฤต (ขาด ≥ 40%)', String(stats.students.critical)],
+                        ['เฝ้าระวัง (ขาด 20-39%)', String(stats.students.monitor)],
+                        ['ติดตาม (ขาด 10-19%)', String(stats.students.followUp)],
+                        ['ปกติ (ขาด < 10%)', String(stats.students.normal)],
                     ],
                     theme: 'grid',
-                    headStyles: { fillColor: [30, 58, 138], fontSize: 10 },
-                    bodyStyles: { fontSize: 9 },
+                    headStyles: { fillColor: [30, 58, 138], fontSize: 10, font },
+                    bodyStyles: { fontSize: 9, font },
                     columnStyles: {
                         0: { cellWidth: 80 },
                         1: { cellWidth: 40, halign: 'center' as const }
@@ -125,15 +197,17 @@ export default function ReportsPage() {
                 : students.filter(s => s.risk_level === filterLevel);
 
             if (filteredStudents.length > 0) {
-                const startY = (doc as unknown as Record<string, Record<string, number>>).lastAutoTable?.finalY + 15 || 90;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const startY = (doc as any).lastAutoTable?.finalY + 15 || 90;
 
                 doc.setFontSize(14);
                 doc.setTextColor(30, 58, 138);
                 const title = filterLevel === 'all'
-                    ? 'At-Risk Students List (Critical + Monitor + Follow-up)'
-                    : `${getRiskLabel(filterLevel)} Students List`;
+                    ? 'รายชื่อนักศึกษาที่มีความเสี่ยง'
+                    : `รายชื่อนักศึกษาระดับ${getRiskLabel(filterLevel)}`;
                 doc.text(title, 14, startY);
 
+                const font = fontRef.current ? 'Sarabun' : 'helvetica';
                 const tableData = filteredStudents.map((s, idx) => [
                     String(idx + 1),
                     s.student_code,
@@ -146,31 +220,32 @@ export default function ReportsPage() {
 
                 doc.autoTable({
                     startY: startY + 4,
-                    head: [['#', 'Student Code', 'Courses', 'Attend %', 'Absent %', 'Risk Level', 'At-Risk Courses']],
+                    head: [['#', 'รหัสนักศึกษา', 'วิชา', '% มาเรียน', '% ขาด', 'ระดับ', 'วิชาเสี่ยง']],
                     body: tableData,
                     theme: 'striped',
-                    headStyles: { fillColor: [220, 38, 38], fontSize: 8 },
-                    bodyStyles: { fontSize: 8 },
+                    headStyles: { fillColor: [220, 38, 38], fontSize: 8, font },
+                    bodyStyles: { fontSize: 8, font },
                     columnStyles: {
                         0: { cellWidth: 10, halign: 'center' as const },
                         1: { cellWidth: 35 },
-                        2: { cellWidth: 20, halign: 'center' as const },
+                        2: { cellWidth: 15, halign: 'center' as const },
                         3: { cellWidth: 25, halign: 'center' as const },
                         4: { cellWidth: 25, halign: 'center' as const },
                         5: { cellWidth: 30, halign: 'center' as const },
-                        6: { cellWidth: 30, halign: 'center' as const }
+                        6: { cellWidth: 25, halign: 'center' as const }
                     },
                     margin: { left: 14, right: 14 },
-                    didParseCell: (data: { section: string; column: { index: number }; cell: { styles: { textColor: number[]; fontStyle: string } }; row: { raw: string[] } }) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    didParseCell: (data: any) => {
                         if (data.section === 'body' && data.column.index === 5) {
-                            const risk = data.row.raw?.[5];
-                            if (risk === 'Critical') {
+                            const risk = data.cell.raw;
+                            if (risk === 'วิกฤต') {
                                 data.cell.styles.textColor = [220, 38, 38];
                                 data.cell.styles.fontStyle = 'bold';
-                            } else if (risk === 'Monitor') {
+                            } else if (risk === 'เฝ้าระวัง') {
                                 data.cell.styles.textColor = [234, 88, 12];
                                 data.cell.styles.fontStyle = 'bold';
-                            } else if (risk === 'Follow-up') {
+                            } else if (risk === 'ติดตาม') {
                                 data.cell.styles.textColor = [37, 99, 235];
                             }
                         }
@@ -184,17 +259,17 @@ export default function ReportsPage() {
                 doc.setPage(i);
                 doc.setFontSize(8);
                 doc.setTextColor(150, 150, 150);
-                doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
-                doc.text('Student Monitoring System', 14, doc.internal.pageSize.getHeight() - 10);
+                doc.text(`หน้า ${i} จาก ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+                doc.text('ระบบดูแลการเรียนของนักศึกษา', 14, doc.internal.pageSize.getHeight() - 10);
             }
 
             const fileName = filterLevel === 'all'
-                ? `student-report-all-${dateStr}.pdf`
-                : `student-report-${filterLevel}-${dateStr}.pdf`;
+                ? `รายงาน-สรุป-${dateStr}.pdf`
+                : `รายงาน-${filterLevel}-${dateStr}.pdf`;
             doc.save(fileName);
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Error generating PDF. Please try again.');
+            alert('เกิดข้อผิดพลาดในการสร้างรายงาน กรุณาลองอีกครั้ง');
         } finally {
             setGenerating(false);
         }
@@ -225,6 +300,18 @@ export default function ReportsPage() {
                     </div>
                 ) : (
                     <div className="space-y-6">
+                        {/* Font Status */}
+                        {fontLoading && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center text-sm text-yellow-700">
+                                กำลังโหลดฟอนต์ภาษาไทย (Sarabun)...
+                            </div>
+                        )}
+                        {fontLoaded && (
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center text-sm text-green-700">
+                                ✅ ฟอนต์ภาษาไทย (Sarabun) พร้อมใช้งาน
+                            </div>
+                        )}
+
                         {/* Stats Summary */}
                         {stats && (
                             <div className="bg-white rounded-xl shadow-md p-6">
@@ -264,7 +351,6 @@ export default function ReportsPage() {
                                 เลือกรายงาน
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* All at-risk */}
                                 <button
                                     onClick={() => generatePDF('all')}
                                     disabled={generating}
@@ -279,7 +365,6 @@ export default function ReportsPage() {
                                     </div>
                                 </button>
 
-                                {/* Critical only */}
                                 <button
                                     onClick={() => generatePDF('critical')}
                                     disabled={generating}
@@ -294,7 +379,6 @@ export default function ReportsPage() {
                                     </div>
                                 </button>
 
-                                {/* Monitor only */}
                                 <button
                                     onClick={() => generatePDF('monitor')}
                                     disabled={generating}
@@ -309,7 +393,6 @@ export default function ReportsPage() {
                                     </div>
                                 </button>
 
-                                {/* Follow-up only */}
                                 <button
                                     onClick={() => generatePDF('follow_up')}
                                     disabled={generating}
