@@ -3,18 +3,44 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { initLiff, getLiffProfile } from '@/lib/liff';
 
 function RegisterForm() {
     const searchParams = useSearchParams();
-    const lineUserId = searchParams.get('lineUserId') || '';
-    const displayName = searchParams.get('displayName') || '';
-    const pictureUrl = searchParams.get('pictureUrl') || '';
+    const lineUserIdParam = searchParams.get('lineUserId') || '';
 
+    const [lineUserId, setLineUserId] = useState(lineUserIdParam);
+    const [displayName, setDisplayName] = useState('');
+    const [pictureUrl, setPictureUrl] = useState('');
     const [studentCode, setStudentCode] = useState('');
     const [loading, setLoading] = useState(false);
+    const [profileLoading, setProfileLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [studentName, setStudentName] = useState('');
+
+    // Init LIFF and get profile directly
+    useEffect(() => {
+        async function loadProfile() {
+            try {
+                await initLiff();
+                const profile = await getLiffProfile();
+                if (profile) {
+                    setLineUserId(profile.userId);
+                    setDisplayName(profile.displayName || '');
+                    setPictureUrl(profile.pictureUrl || '');
+                }
+            } catch (err) {
+                console.error('LIFF profile error:', err);
+                // Fall back to URL params
+                setDisplayName(searchParams.get('displayName') || '');
+                setPictureUrl(searchParams.get('pictureUrl') || '');
+            } finally {
+                setProfileLoading(false);
+            }
+        }
+        loadProfile();
+    }, []);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -78,7 +104,11 @@ function RegisterForm() {
             <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full">
                 {/* Profile */}
                 <div className="text-center mb-6">
-                    {pictureUrl ? (
+                    {profileLoading ? (
+                        <div className="w-20 h-20 rounded-full bg-green-100 mx-auto mb-3 flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+                        </div>
+                    ) : pictureUrl ? (
                         <img
                             src={pictureUrl}
                             alt="profile"
@@ -125,7 +155,7 @@ function RegisterForm() {
 
                     <button
                         type="submit"
-                        disabled={!studentCode.trim() || loading}
+                        disabled={!studentCode.trim() || loading || !lineUserId}
                         className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-200 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading ? (
