@@ -7,13 +7,15 @@ export async function GET(request: NextRequest) {
     const minAbsenceRate = searchParams.get('minAbsenceRate');
     const faculty = searchParams.get('faculty');
     const yearLevel = searchParams.get('yearLevel');
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const search = searchParams.get('search');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const page = parseInt(searchParams.get('page') || '1');
+    const offset = (page - 1) * limit;
 
     try {
         let query = supabase
             .from('student_analytics')
-            .select('*')
+            .select('*', { count: 'exact' })
             .order('avg_absence_rate', { ascending: false });
 
         // Apply filters
@@ -33,6 +35,10 @@ export async function GET(request: NextRequest) {
             query = query.eq('year_level', parseInt(yearLevel));
         }
 
+        if (search && search.trim()) {
+            query = query.or(`student_code.ilike.%${search.trim()}%,student_name.ilike.%${search.trim()}%`);
+        }
+
         // Apply pagination
         query = query.range(offset, offset + limit - 1);
 
@@ -44,9 +50,10 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             data,
-            total: count,
+            total: count || 0,
+            page,
             limit,
-            offset
+            totalPages: Math.ceil((count || 0) / limit)
         });
     } catch (error) {
         return NextResponse.json(
