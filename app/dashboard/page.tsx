@@ -24,6 +24,9 @@ interface Stats {
         total: number;
         list: string[];
     };
+    consecutiveAbsence?: {
+        studentsCount: number;
+    };
 }
 
 export default function DashboardPage() {
@@ -212,8 +215,8 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Course Alerts */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Alerts Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
                         <div className="bg-yellow-50 p-3 rounded-xl flex-shrink-0">
                             <AlertTriangle className="w-6 h-6 text-yellow-500" />
@@ -235,6 +238,19 @@ export default function DashboardPage() {
                         </div>
                         <span className="text-2xl font-bold text-red-600">{stats.courses.highAbsence}</span>
                     </div>
+
+                    <Link href="/dashboard/consecutive-absence" className="group">
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:shadow-md hover:border-orange-200 transition-all h-full">
+                            <div className="bg-orange-50 p-3 rounded-xl flex-shrink-0">
+                                <AlertOctagon className="w-6 h-6 text-orange-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900">ขาดเรียน 3 ครั้งติดกัน</p>
+                                <p className="text-xs text-gray-500">นักศึกษาที่ขาดล่าสุดติดกัน</p>
+                            </div>
+                            <span className="text-2xl font-bold text-orange-600">{stats.consecutiveAbsence?.studentsCount || 0}</span>
+                        </div>
+                    </Link>
                 </div>
 
                 {/* Quick Navigation */}

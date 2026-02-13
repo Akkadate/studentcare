@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+function getTrailingAbsences(classCheckRaw: string): number {
+    if (!classCheckRaw) return 0;
+    const entries = classCheckRaw.split(',').map(s => s.trim().toUpperCase()).filter(e => ['P', 'A', 'L', 'S'].includes(e));
+    let count = 0;
+    for (let i = entries.length - 1; i >= 0; i--) {
+        if (entries[i] === 'A') count++;
+        else break;
+    }
+    return count;
+}
+
 export async function GET(request: NextRequest) {
     try {
         // Get statistics for dashboard
         const [studentsResult, coursesResult, attendanceResult] = await Promise.all([
             supabase.from('student_analytics').select('risk_level, id, faculty').select(),
             supabase.from('course_analytics').select('has_no_checks, students_high_absence').select(),
-            supabase.from('attendance_records').select('id').select()
+            supabase.from('attendance_records').select('id, student_code, class_check_raw').select()
         ]);
 
         // Count students by risk level
@@ -27,7 +38,16 @@ export async function GET(request: NextRequest) {
         const totalCourses = courses.length;
 
         // Total attendance records
-        const totalRecords = attendanceResult.data?.length || 0;
+        const allRecords = attendanceResult.data || [];
+        const totalRecords = allRecords.length;
+
+        // Count unique students with 3+ consecutive trailing absences
+        const studentsWithConsecutive = new Set<string>();
+        for (const rec of allRecords) {
+            if (rec.class_check_raw && getTrailingAbsences(rec.class_check_raw) >= 3) {
+                studentsWithConsecutive.add(rec.student_code);
+            }
+        }
 
         return NextResponse.json({
             students: {
@@ -48,6 +68,9 @@ export async function GET(request: NextRequest) {
             faculties: {
                 total: uniqueFaculties.size,
                 list: Array.from(uniqueFaculties).sort()
+            },
+            consecutiveAbsence: {
+                studentsCount: studentsWithConsecutive.size
             }
         });
     } catch (error) {
